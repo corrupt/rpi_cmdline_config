@@ -1,6 +1,8 @@
 # Ansible rpi_cmdline_config
 Ansible module to modify or set Raspberry Pi /boot/cmdline.txt arguments.
 
+![tests](https://github.com/corrupt/rpi_cmdline_config/actions/workflows/tests.yml/badge.svg)
+
 ## Options
 
 ```yaml

@@ -1,9 +1,10 @@
 import pytest
 from rpi_cmdline_config import KernelParams
 
+
 @pytest.fixture
 def default_string() -> str:
-    return "console=serial0,115200 console=tty1 root=PARTUUID=0f6fe73a-02 rootfstype=ext4 fsck.repair=yes rootwait"
+    return "console=serial0,115200 console=tty1 root=PARTUUID=0f6fe73a-02 rootfstype=ext4 fsck.repair=yes rootwait"  # noqa: 501
 
 
 @pytest.fixture

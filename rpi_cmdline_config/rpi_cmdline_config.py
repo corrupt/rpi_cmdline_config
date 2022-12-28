@@ -59,7 +59,7 @@ options:
 
 author:
     - corrupt (@corrupt)    
-'''
+''' # noqa: 501
 
 EXAMPLES = r'''
 # Add USB OTG support
@@ -70,19 +70,18 @@ EXAMPLES = r'''
     after: rootwait
 '''
 
-RETURN = r''' # ''' 
+RETURN = r''' # '''
 
-from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.common.arg_spec import ArgumentSpecValidator
+from ansible.module_utils.basic import AnsibleModule  # noqa: 402
+from ansible.module_utils.common.arg_spec import ArgumentSpecValidator  # noqa: 402
+
 
 class KernelParams:
 
     params: list = []
 
-
     def __init__(self, cmdline: str):
         self.params = self._tokenize(cmdline)
-
 
     def _tokenize(self, input: str) -> list:
         tokens = input.split()
@@ -96,8 +95,15 @@ class KernelParams:
             parsed.append({'key': key, 'value': values})
         return parsed
 
-
-    def add_param(self, key: str, values: list, before: str = None, after: str = None, unique: bool = True) -> 'KernelParams':
+    # noqa: C901
+    def add_param(
+        self,
+        key: str,
+        values: list,
+        before: str = None,
+        after: str = None,
+        unique: bool = True
+    ) -> 'KernelParams':
         new = {'key': key, 'value': values}
 
         new_params = self.params.copy()
@@ -108,36 +114,33 @@ class KernelParams:
                     for value in values:
                         if value not in pair['value']:
                             pair['value'].append(value)
+        elif after is not None:
+            new_params.reverse()
+            for i, pair in enumerate(new_params):
+                if pair['key'] == after:
+                    new_params.insert(i, new)
+                    new_params.reverse()
+                    self.params = new_params
+                    return self
+            new_params.reverse()
+            new_params.append(new)
+        elif before is not None:
+            for i, pair in enumerate(new_params):
+                if pair['key'] == before:
+                    new_params.insert(i, new)
+                    self.params = new_params
+                    return self
+            new_params.append(new)
         else:
-            if after is not None:
-                new_params.reverse()
-                for i, pair in enumerate(new_params):
-                    if pair['key'] == after:
-                        new_params.insert(i, new)
-                        new_params.reverse()
-                        self.params = new_params
-                        return self
-                new_params.reverse()
-                new_params.append(new)
-            elif before is not None:
-                for i, pair in enumerate(new_params):
-                    if pair['key'] == before:
-                        new_params.insert(i, new)
-                        self.params = new_params
-                        return self
-                new_params.append(new)
-            else:
-                new_params.append(new)
+            new_params.append(new)
         self.params = new_params
         return self
-
 
     def has_param(self, key: str) -> bool:
         for pair in self.params:
             if pair['key'] == key:
                 return True
         return False
-
 
     def to_string(self) -> str:
         ret = ""
@@ -153,18 +156,18 @@ class KernelParams:
         return ret.strip()
 
 
-# ------------------------------------------------------------------------------------------------ #
+# -------------------------------------------------------------------------- #
 
 
 def run_module():
     module_args = dict(
-        cmdline = dict(type='str', default="/boot/cmdline.txt"),
-        key = dict(type='str', default=None),
-        values = dict(type='list', elements='str', default=None),
-        atom = dict(type='str', default=None),
-        unique = dict(type='bool', default=True),
-        after = dict(type='str', default=None),
-        before = dict(type='str', default=None),
+        cmdline=dict(type='str', default="/boot/cmdline.txt"),
+        key=dict(type='str', default=None),
+        values=dict(type='list', elements='str', default=None),
+        atom=dict(type='str', default=None),
+        unique=dict(type='bool', default=True),
+        after=dict(type='str', default=None),
+        before=dict(type='str', default=None),
     )
     mutually_exclusive = [
         ('key', 'atom'),
@@ -201,6 +204,12 @@ def run_module():
 
     validation_result = validator.validate(module.params)
 
+    if len(validation_result.error_messages) > 0:
+        module.fail_json(
+            msg="Failed parameter validation",
+            **validation_result.error_messages,
+        )
+
     filename = module.params['cmdline']
     key = module.params['key']
     values = module.params['values']
@@ -230,7 +239,7 @@ def run_module():
         result['original_message'] = f"Old cmdline: '{cmdline}'"
     except IOError as e:
         module.fail_json(msg=f"Unable to modify {filename}: {e}", **result)
-    
+
     module.exit_json(**result)
 
 
