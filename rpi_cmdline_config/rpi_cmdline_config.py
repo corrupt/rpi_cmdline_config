@@ -192,7 +192,7 @@ def run_module():
         with open(filename, 'w') as f:
             f.write(f"{new_cmdline}\n")
 
-        result['changed'] = cmdline != new_cmdline
+        result['changed'] = cmdline.strip() != new_cmdline.strip()
         result['message'] = f"New cmdline: '{new_cmdline}'"
         result['original_message'] = f"Old cmdline: '{cmdline}'"
     except IOError as e:
