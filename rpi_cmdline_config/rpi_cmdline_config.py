@@ -178,23 +178,23 @@ def run_module():
 
     try:
         with open(filename, 'r') as f:
-            str = f.read()
+            cmdline = f.read()
 
-        params = tokenize(str)
+        params = tokenize(cmdline)
 
         if key is not None and values is not None:
             params = add_param(params, key, values, after, unique)
         elif atom is not None:
             params = add_param(params, atom, None, after, unique)
 
-        newStr = to_string(params)
+        new_cmdline = to_string(params)
 
         with open(filename, 'w') as f:
-            f.write(newStr)
+            f.write(f"{new_cmdline}\n")
 
-        result['changed'] = str != newStr
-        result['message'] = f"New cmdline: '{newStr}'"
-        result['original_message'] = f"Old cmdline: '{str}'"
+        result['changed'] = cmdline != new_cmdline
+        result['message'] = f"New cmdline: '{new_cmdline}'"
+        result['original_message'] = f"Old cmdline: '{cmdline}'"
     except IOError as e:
         module.fail_json(msg=f"Unable to modify {filename}: {e}", **result)
     
