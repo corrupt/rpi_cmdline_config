@@ -124,6 +124,25 @@ class TestAddparam():
         assert default_params.to_string().endswith(" rootwait quiet")
 
 
+    def test_multiple_non_uniques(self, default_string):
+
+
+        p = KernelParams("root=PARTUUID=0f6fe73a-02 rootfstype=ext4 fsck.repair=yes rootwait")
+        p.add_param(
+            key = 'console',
+            values = ['serial0', '115200'],
+            before = 'root',
+        )
+        p.add_param(
+            key = 'console',
+            values = ['tty1'],
+            before = 'root',
+            unique = False,
+        )
+        assert p.to_string() == default_string
+        
+
+
 
 class TestToString():
 
