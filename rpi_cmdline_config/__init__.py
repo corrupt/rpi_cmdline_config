@@ -1,1 +1,1 @@
-from rpi_cmdline_config import *
+from .rpi_cmdline_config import KernelParams

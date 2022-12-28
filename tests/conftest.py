@@ -1,13 +1,15 @@
 import pytest
+from rpi_cmdline_config import KernelParams
 
 @pytest.fixture
-def default_string():
+def default_string() -> str:
     return "console=serial0,115200 console=tty1 root=PARTUUID=0f6fe73a-02 rootfstype=ext4 fsck.repair=yes rootwait"
 
 
 @pytest.fixture
-def default_params():
-    return [
+def default_params() -> KernelParams:
+    k = object.__new__(KernelParams)
+    k.params = [
         {
             'key': 'console',
             'value': ['serial0', '115200'],
@@ -33,6 +35,7 @@ def default_params():
             'value': None,
         },
     ]
+    return k
 
 
 @pytest.fixture

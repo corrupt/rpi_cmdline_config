@@ -42,9 +42,17 @@ options:
         required: false
         type: bool
         default: true
+    before:
+        description:
+            - For key=value pairs or atoms that need to be present before others (like 'rootwait'), pass the one before which to add them here
+            - Mutually exclusive with I(after)
+        required: false
+        type: str
+        default: false
     after:
         description:
             - For key=value pairs or atoms that need others to be there first (like 'rootwait'), pass the one after which to add them here
+            - Mutually exclusive with I(before)
         required: false
         type: str
         default: false
@@ -67,63 +75,85 @@ RETURN = r''' # '''
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.arg_spec import ArgumentSpecValidator
 
+class KernelParams:
 
-def tokenize(input: str) -> list:
-    tokens = input.split()
-    parsed = []
-    for token in tokens:
-        key, *value = token.split("=", 1)
-        if value == []:
-            values = None
+    params: list = []
+
+
+    def __init__(self, cmdline: str):
+        self.params = self._tokenize(cmdline)
+
+
+    def _tokenize(self, input: str) -> list:
+        tokens = input.split()
+        parsed = []
+        for token in tokens:
+            key, *value = token.split("=", 1)
+            if value == []:
+                values = None
+            else:
+                values = value[0].split(",")
+            parsed.append({'key': key, 'value': values})
+        return parsed
+
+
+    def add_param(self, key: str, values: list, before: str = None, after: str = None, unique: bool = True) -> 'KernelParams':
+        new = {'key': key, 'value': values}
+
+        new_params = self.params.copy()
+
+        if unique and self.has_param(key):
+            for i, pair in enumerate(new_params):
+                if pair['key'] == key and values is not None:
+                    for value in values:
+                        if value not in pair['value']:
+                            pair['value'].append(value)
         else:
-            values = value[0].split(",")
-        parsed.append({'key': key, 'value': values})
-    return parsed
+            if after is not None:
+                new_params.reverse()
+                for i, pair in enumerate(new_params):
+                    if pair['key'] == after:
+                        new_params.insert(i, new)
+                        new_params.reverse()
+                        self.params = new_params
+                        return self
+                new_params.reverse()
+                new_params.append(new)
+            elif before is not None:
+                for i, pair in enumerate(new_params):
+                    if pair['key'] == before:
+                        new_params.insert(i, new)
+                        self.params = new_params
+                        return self
+                new_params.append(new)
+            else:
+                new_params.append(new)
+        self.params = new_params
+        return self
 
 
-def add_param(params: list, key: str, values: list, after: str = None, unique: bool = True) -> dict:
-    new = {'key': key, 'value': values}
-
-    if unique and has_param(params, key):
-        for i, pair in enumerate(params):
-            if pair['key'] == key and values is not None:
-                for value in values:
-                    if value not in pair['value']:
-                        pair['value'].append(value)
-    else:
-        if after is None:
-            params.append(new)
-        else:
-            params.reverse()
-            for i, pair in enumerate(params):
-                if pair['key'] == after:
-                    params.insert(i, new)
-                    params.reverse()
-                    return params
-            params.reverse()
-            params.append(new)
-    return params
+    def has_param(self, key: str) -> bool:
+        for pair in self.params:
+            if pair['key'] == key:
+                return True
+        return False
 
 
-def has_param(params: list, key: str) -> bool:
-    for pair in params:
-        if pair['key'] == key:
-            return True
-    return False
+    def to_string(self) -> str:
+        ret = ""
+        for pair in self.params:
+            key = pair['key']
+            value = pair['value']
+            if value is None:
+                ret += f"{key} "
+            elif isinstance(value, list):
+                ret += f"{key}={','.join(value)} "
+            else:
+                ret += f"{key}={value} "
+        return ret.strip()
 
 
-def to_string(params: list) -> str:
-    ret = ""
-    for pair in params:
-        key = pair['key']
-        value = pair['value']
-        if value is None:
-            ret += f"{key} "
-        elif isinstance(value, list):
-            ret += f"{key}={','.join(value)} "
-        else:
-            ret += f"{key}={value} "
-    return ret.strip()
+# ------------------------------------------------------------------------------------------------ #
 
 
 def run_module():
@@ -134,16 +164,18 @@ def run_module():
         atom = dict(type='str', default=None),
         unique = dict(type='bool', default=True),
         after = dict(type='str', default=None),
+        before = dict(type='str', default=None),
     )
     mutually_exclusive = [
         ('key', 'atom'),
-        ('values', 'atom')
+        ('values', 'atom'),
+        ('before', 'after'),
     ]
     required_one_of = [
-        ('atom', 'key')
+        ('atom', 'key'),
     ]
     required_together = [
-        ('key', 'values')
+        ('key', 'values'),
     ]
 
     result = dict(
@@ -174,25 +206,26 @@ def run_module():
     values = module.params['values']
     atom = module.params['atom']
     after = module.params['after']
+    before = module.params['before']
     unique = module.params['unique']
 
     try:
         with open(filename, 'r') as f:
-            cmdline = f.read()
+            cmdline = f.read().strip()
 
-        params = tokenize(cmdline)
+        params = KernelParams(cmdline)
 
         if key is not None and values is not None:
-            params = add_param(params, key, values, after, unique)
+            params.add_param(key, values, before, after, unique)
         elif atom is not None:
-            params = add_param(params, atom, None, after, unique)
+            params.add_param(atom, None, before, after, unique)
 
-        new_cmdline = to_string(params)
+        new_cmdline = params.to_string()
 
         with open(filename, 'w') as f:
             f.write(f"{new_cmdline}\n")
 
-        result['changed'] = cmdline.strip() != new_cmdline.strip()
+        result['changed'] = cmdline != new_cmdline
         result['message'] = f"New cmdline: '{new_cmdline}'"
         result['original_message'] = f"Old cmdline: '{cmdline}'"
     except IOError as e:

@@ -1,17 +1,23 @@
 import pytest
 
-from rpi_cmdline_config.rpi_cmdline_config import tokenize, add_param, to_string
+from rpi_cmdline_config.rpi_cmdline_config import KernelParams
+
+class TestFixtures:
+
+    def test_fixtures(self, default_string, default_params):
+        assert default_params.to_string() == default_string
+
 
 class TestTokenize():
 
     def test_default_string(self, default_string, default_params):
 
-        for i, val in enumerate(tokenize(default_string)):
-            assert val == default_params[i]
+        for i, val in enumerate(KernelParams(default_string).params):
+            assert val == default_params.params[i]
 
     def test_empty_string(self, empty_string):
-        params = tokenize(empty_string)
-        assert len(params) == 0
+        params = KernelParams(empty_string)
+        assert len(params.params) == 0
 
 
 
@@ -19,18 +25,20 @@ class TestAddparam():
 
     def test_param_presence(self, default_string, default_params):
 
-        params = tokenize(default_string)
-        params.insert(3, {'key': 'testKey', 'value': 'testVal'})
-        testParams = add_param(default_params, 'testKey', 'testVal', after='root')
+        p = KernelParams(default_string)
+        p.params.insert(3, {'key': 'testKey', 'value': ['testVal']})
 
-        assert params == testParams
+        default_params.add_param(key = 'testKey',  values = ['testVal'], after='root')
+
+        assert p.params == default_params.params
+
 
     def test_uniqueness(self, default_params):
 
-        testParams = add_param(default_params, 'modules-load', ['dwc2'], 'rootwait', True)
-        testParams = add_param(default_params, 'modules-load', ['g_ether'], 'rootwait', True)
+        default_params.add_param('modules-load', ['dwc2'], 'rootwait', True)
+        default_params.add_param('modules-load', ['g_ether'], 'rootwait', True)
 
-        for p in testParams:
+        for p in default_params.params:
             if p['key'] == 'modules-load':
                 assert 'dwc2' in p['value']
                 assert 'g_ether' in p['value']
@@ -38,11 +46,14 @@ class TestAddparam():
 
     def test_atom_uniqueness(self, default_params):
 
-        testParams = add_param(default_params, 'modules-load', None, 'rootwait', True)
-        testParams = add_param(default_params, 'modules-load', None, 'rootwait', True)
+        default_params.add_param(
+            key='modules-load',
+            values=None,
+            after='rootwait'
+        )
 
         count = 0
-        for p in testParams:
+        for p in default_params.params:
             if p['key'] == 'modules-load':
                 count += 1
         assert count == 1
@@ -50,11 +61,21 @@ class TestAddparam():
 
     def test_atom_non_uniqueness(self, default_params):
 
-        testParams = add_param(default_params, 'modules-load', None, 'rootwait', False)
-        testParams = add_param(default_params, 'modules-load', None, 'rootwait', False)
+        default_params.add_param(
+            key = 'modules-load',
+            values = None,
+            after = 'rootwait',
+            unique = False
+        )
+        default_params.add_param(
+            key = 'modules-load',
+            values = None,
+            after = 'rootwait',
+            unique = False
+        )
 
         count = 0
-        for p in testParams:
+        for p in default_params.params:
             if p['key'] == 'modules-load':
                 count += 1
         assert count == 2
@@ -62,11 +83,21 @@ class TestAddparam():
 
     def test_non_uniqueness(self, default_params):
 
-        testParams = add_param(default_params, 'modules-load', ['dwc2'], 'rootwait', False)
-        testParams = add_param(default_params, 'modules-load', ['g_ether'], 'rootwait', False)
+        default_params.add_param(
+            key = 'modules-load',
+            values = ['dwc2'],
+            after = 'rootwait',
+            unique = False
+        )
+        default_params.add_param(
+            key = 'modules-load',
+            values = ['g_ether'],
+            after = 'rootwait',
+            unique = False
+        )
 
         count = 0
-        for p in testParams:
+        for p in default_params.params:
             if p['key'] == 'modules-load':
                 count += 1
                 assert len(p['value']) == 1
@@ -74,16 +105,40 @@ class TestAddparam():
         assert count == 2
 
 
+    def test_before(self, default_params):
+
+        default_params.add_param(
+            key = 'quiet',
+            values = None,
+            before = 'rootwait'
+        )
+        assert default_params.to_string().endswith(" quiet rootwait")
+
+
+    def test_after(self, default_params):
+        default_params.add_param(
+            key = 'quiet',
+            values = None,
+            after='rootwait'
+        )
+        assert default_params.to_string().endswith(" rootwait quiet")
+
+
 
 class TestToString():
 
     def test_toString(self, default_string, default_params):
 
-        assert default_string == to_string(default_params)
+        assert default_string == default_params.to_string()
 
 
     def test_add_modules_load(self, default_string):
 
-        test_string = to_string(add_param(tokenize(default_string), 'modules-load', ['dwc2', 'g_ether'], 'rootwait'))
+        test_string = KernelParams(default_string).add_param(
+            key = 'modules-load',
+            values = ['dwc2', 'g_ether'],
+            after = 'rootwait'
+        ).to_string()
+
         assert test_string == default_string + " modules-load=dwc2,g_ether"
 
