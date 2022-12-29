@@ -162,16 +162,15 @@ class KernelParams:
 def run_module():
     module_args = dict(
         cmdline=dict(type='str', default="/boot/cmdline.txt"),
-        key=dict(type='str', default=None),
-        values=dict(type='list', elements='str', default=None),
-        atom=dict(type='str', default=None),
-        unique=dict(type='bool', default=True),
-        after=dict(type='str', default=None),
-        before=dict(type='str', default=None),
+        key=dict(type='str'),
+        values=dict(type='list', elements='str'),
+        atom=dict(type='str'),
+        unique=dict(type='bool'),
+        after=dict(type='str'),
+        before=dict(type='str'),
     )
     mutually_exclusive = [
         ('key', 'atom'),
-        ('values', 'atom'),
         ('before', 'after'),
     ]
     required_one_of = [
@@ -202,12 +201,15 @@ def run_module():
         required_together=required_together,
     )
 
-    validation_result = validator.validate(module.params)
+    validation_result = validator.validate(
+        {k: v for k, v in module.params if v is not None}
+    )
 
-    if len(validation_result.error_messages) > 0:
+    if validation_result.error_messages:
+        result['message'] = ",".join(validation_result.error_messages)
         module.fail_json(
             msg="Failed parameter validation",
-            **validation_result.error_messages,
+            **result
         )
 
     filename = module.params['cmdline']
